@@ -149,19 +149,153 @@
     }
   }
 
-  // ---- Botões de compra
-  function buy() {
-    if (CHECKOUT_URL) { location.href = CHECKOUT_URL; }
-    else toast("Em breve");
+  // ---- Seleção de modelo / tamanho / quantidade (abre ao clicar em Comprar)
+  var MODELS = [
+    "Norisk FF302 Soul Azul",
+    "Norisk FF302 Soul Grand Prix Itália",
+    "Norisk FF302 Soul Grand Prix Inglaterra",
+    "Norisk FF302 Soul Grand Prix Brasil",
+    "Norisk FF302 Soul Grand Prix Alemanha",
+    "Norisk Flow Monocolor Preto Fosco",
+    "LS2 FF358 Preto/Vermelho",
+    "LS2 FF358 Branco/Preto",
+    "LS2 FF358 Starwar Preto/Cinza Fosco",
+    "Norisk FF302 Soul Monocolor Preto Fosco",
+    "Norisk FF302 Soul Rosa Fosco",
+    "Norisk FF302 Soul World Challenge Branco/Vermelho"
+  ];
+  var SIZES = ["56", "58", "60", "62"];
+  var imgs = thumbs.map(function (t) { var im = $("img", t); return im ? im.getAttribute("src") : ""; });
+  var sel = { model: 0, size: "58", qty: 1 };
+  var sheet = null;
+
+  function css(el, st) { el.style.cssText = st; return el; }
+  function h(tag, st, txt) { var e = document.createElement(tag); if (st) e.style.cssText = st; if (txt) e.textContent = txt; return e; }
+  var PINK = "var(--tt)";
+
+  function closeSheet() {
+    if (!sheet) return;
+    sheet.remove(); sheet = null;
+    document.body.style.overflow = "";
   }
+
+  function openSheet() {
+    if (sheet) return;
+    document.body.style.overflow = "hidden";
+    sheet = h("div", "position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center");
+    sheet.setAttribute("role", "dialog");
+    sheet.setAttribute("aria-label", "Selecionar opções");
+    sheet.addEventListener("click", function (e) { if (e.target === sheet) closeSheet(); });
+
+    var box = h("div", "background:var(--background);width:100%;max-width:500px;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;font-size:14px");
+    if (window.innerWidth >= 640) box.style.maxWidth = "420px";
+
+    // topo: foto + preço + fechar
+    var head = h("div", "display:flex;gap:12px;align-items:flex-start;margin-bottom:16px");
+    var pic = h("img", "width:64px;height:64px;object-fit:contain;border-radius:8px;background:var(--muted)");
+    pic.alt = "";
+    var info = h("div", "flex:1;min-width:0");
+    info.appendChild(h("div", "color:" + PINK + ";font-weight:700;font-size:18px", "R$ 68,34"));
+    info.appendChild(h("div", "color:#8a8a8a;font-size:12px;text-decoration:line-through", "R$ 947,90"));
+    var chosen = h("div", "font-size:12px;color:#666;margin-top:2px");
+    info.appendChild(chosen);
+    var x = h("button", "width:32px;height:32px;border:0;background:none;font-size:22px;line-height:1;cursor:pointer;color:inherit", "×");
+    x.setAttribute("aria-label", "Fechar");
+    x.addEventListener("click", closeSheet);
+    head.appendChild(pic); head.appendChild(info); head.appendChild(x);
+    box.appendChild(head);
+
+    // modelos
+    box.appendChild(h("div", "font-weight:600;margin-bottom:8px", "Modelo"));
+    var grid = h("div", "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px");
+    var cells = MODELS.map(function (name, i) {
+      var b = h("button", "aspect-ratio:1/1;border-radius:6px;padding:2px;background:var(--muted);cursor:pointer;overflow:hidden;border:2px solid transparent");
+      b.setAttribute("aria-label", name);
+      b.title = name;
+      var im = h("img", "width:100%;height:100%;object-fit:contain;display:block");
+      im.src = imgs[i] || ""; im.alt = name;
+      b.appendChild(im);
+      b.addEventListener("click", function () { sel.model = i; render(); });
+      grid.appendChild(b);
+      return b;
+    });
+    box.appendChild(grid);
+
+    // tamanhos
+    box.appendChild(h("div", "font-weight:600;margin-bottom:8px", "Tamanho"));
+    var sg = h("div", "display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px");
+    var sbtn = SIZES.map(function (z) {
+      var b = h("button", "height:36px;border-radius:6px;cursor:pointer;border:1px solid transparent;font-size:13px", z);
+      b.addEventListener("click", function () { sel.size = z; render(); });
+      sg.appendChild(b);
+      return b;
+    });
+    box.appendChild(sg);
+
+    // quantidade
+    var qrow = h("div", "display:flex;align-items:center;justify-content:space-between;margin-bottom:16px");
+    qrow.appendChild(h("div", "font-weight:600", "Quantidade"));
+    var qc = h("div", "display:flex;align-items:center;gap:14px");
+    var minus = h("button", "width:28px;height:28px;border:0;background:none;font-size:20px;cursor:pointer;color:inherit", "−");
+    var qn = h("span", "min-width:18px;text-align:center");
+    var plus = h("button", "width:28px;height:28px;border:0;background:none;font-size:20px;cursor:pointer;color:inherit", "+");
+    minus.setAttribute("aria-label", "Diminuir"); plus.setAttribute("aria-label", "Aumentar");
+    minus.addEventListener("click", function () { sel.qty = Math.max(1, sel.qty - 1); render(); });
+    plus.addEventListener("click", function () { sel.qty = Math.min(10, sel.qty + 1); render(); });
+    qc.appendChild(minus); qc.appendChild(qn); qc.appendChild(plus);
+    qrow.appendChild(qc);
+    box.appendChild(qrow);
+
+    var go = h("button", "width:100%;height:48px;border:0;border-radius:999px;background:" + PINK + ";color:#fff;font-weight:600;font-size:15px;cursor:pointer", "Comprar agora");
+    go.addEventListener("click", confirmSelection);
+    box.appendChild(go);
+
+    function render() {
+      cells.forEach(function (b, i) {
+        var on = i === sel.model;
+        b.style.borderColor = on ? PINK : "transparent";
+      });
+      sbtn.forEach(function (b, i) {
+        var on = SIZES[i] === sel.size;
+        b.style.background = on ? "color-mix(in oklab," + PINK + " 15%, white)" : "var(--muted)";
+        b.style.borderColor = on ? PINK : "transparent";
+        b.style.color = on ? PINK : "inherit";
+      });
+      qn.textContent = sel.qty;
+      pic.src = imgs[sel.model] || "";
+      chosen.textContent = MODELS[sel.model] + " · Tam " + sel.size;
+    }
+    render();
+    sheet.appendChild(box);
+    document.body.appendChild(sheet);
+  }
+
+  function selection() {
+    return { opcao: MODELS[sel.model] + " - Tam " + sel.size, qtd: sel.qty };
+  }
+  // Chamado por "Comprar agora". Quando CHECKOUT_URL estiver preenchido, leva o pedido para lá.
+  function confirmSelection() {
+    var s = selection();
+    window.pedidoSelecionado = s;
+    document.dispatchEvent(new CustomEvent("pedido:selecionado", { detail: s }));
+    if (CHECKOUT_URL) {
+      var sep = CHECKOUT_URL.indexOf("?") > -1 ? "&" : "?";
+      location.href = CHECKOUT_URL + sep + "opcao=" + encodeURIComponent(s.opcao) + "&qtd=" + s.qtd;
+    } else {
+      closeSheet();
+      toast("Selecionado: " + s.opcao + " (x" + s.qtd + ")");
+    }
+  }
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSheet(); });
+
   var bar = $('[aria-label="Compra rápida"]');
   if (bar) {
     var btns = $$("button", bar);
     var chat = btns[0], add = btns[1], buyBtn = btns[2];
-    if (add) add.addEventListener("click", function () { CHECKOUT_URL ? buy() : toast("Adicionado ao carrinho"); });
-    if (buyBtn) buyBtn.addEventListener("click", buy);
+    if (add) add.addEventListener("click", openSheet);
+    if (buyBtn) buyBtn.addEventListener("click", openSheet);
     if (chat) chat.addEventListener("click", function () { toast("Atendimento: seg a sex, 9h às 18h"); });
   }
   var cart = $('[aria-label="Carrinho"]') || $$("header button")[2];
-  if (cart) cart.addEventListener("click", buy);
+  if (cart) cart.addEventListener("click", openSheet);
 })();
